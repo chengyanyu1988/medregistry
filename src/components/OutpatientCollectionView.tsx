@@ -52,10 +52,10 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
   // Table tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'collected'>('pending');
 
-  // Selected checkboxes
+  // Selected checkboxes - 默认勾选张亮最新的 2026-11-11 门诊待采标本
   const [selectedPendingBarcodes, setSelectedPendingBarcodes] = useState<string[]>([
-    '423423501',
-    '423423502',
+    '423424101',
+    '423424102',
   ]);
   const [selectedCollectedBarcodes, setSelectedCollectedBarcodes] = useState<string[]>([]);
 
@@ -65,9 +65,10 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
   const [isBarcodePrintOpen, setIsBarcodePrintOpen] = useState(false);
   const [isPrintSettingsOpen, setIsPrintSettingsOpen] = useState(false);
 
-  // 近期开单时间范围筛选状态 (基准 2026-10-26)
+  // 近期开单时间范围筛选状态 (基准 2026-11-10 ~ 2026-11-11)
   const [startDate, setStartDate] = useState<string>(DEFAULT_OUTPATIENT_START_DATE);
   const [endDate, setEndDate] = useState<string>(DEFAULT_OUTPATIENT_END_DATE);
+  const [dateFilterMode, setDateFilterMode] = useState<'today' | 'recent' | 'all'>('recent');
 
   // Search filter for tables
   const [tableSearch, setTableSearch] = useState('');
@@ -77,6 +78,60 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
 
   // Detail modal for specimen guidance or barcode preview
   const [guidanceSample, setGuidanceSample] = useState<OutpatientSampleItem | null>(null);
+
+  // 患者信息快速检索
+  const handleSearchPatient = (queryOverride?: string) => {
+    const raw = queryOverride !== undefined ? queryOverride : searchQuery;
+    const query = raw.trim().toLowerCase();
+    if (!query) {
+      triggerAction('请输入患者姓名、就诊号或条形码进行智能检索');
+      return;
+    }
+    const all = [...pendingSamples, ...collectedSamples];
+    const match = all.find(
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        s.patientId.toLowerCase().includes(query) ||
+        s.barcode.toLowerCase().includes(query)
+    );
+    if (match) {
+      setPatient({
+        outpatientNo: match.patientId,
+        name: match.name,
+        gender: match.gender,
+        age: match.age,
+        profession: '门诊自费/医保',
+        phone: '138****' + match.barcode.slice(-4),
+      });
+      // 联动勾选该患者的待采标本
+      const matchedBarcodes = pendingSamples
+        .filter((s) => s.patientId === match.patientId || s.name === match.name)
+        .map((s) => s.barcode);
+      if (matchedBarcodes.length > 0) {
+        setSelectedPendingBarcodes(matchedBarcodes);
+      }
+      triggerAction(`已定位患者 [${match.name}]（就诊号：${match.patientId}），关联 ${matchedBarcodes.length} 份待采集标本`);
+    } else {
+      triggerAction(`未检索到就诊号或姓名包含 "${query}" 的记录`);
+    }
+  };
+
+  const handleApplyDatePreset = (preset: 'today' | 'recent' | 'all') => {
+    setDateFilterMode(preset);
+    if (preset === 'today') {
+      setStartDate('2026-11-11 00:00');
+      setEndDate('2026-11-11 23:59');
+      triggerAction('已切换为今日（2026-11-11）门诊采血记录');
+    } else if (preset === 'recent') {
+      setStartDate('2026-11-10 00:00');
+      setEndDate('2026-11-11 23:59');
+      triggerAction('已切换为近2日门诊采血记录（2026-11-10 ~ 2026-11-11）');
+    } else {
+      setStartDate('2026-10-01 00:00');
+      setEndDate('2026-11-11 23:59');
+      triggerAction('已显示全部历史与近期门诊采血记录');
+    }
+  };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -138,6 +193,47 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
     triggerAction(`已成功确认完成 ${toComplete.length} 例标本采集，标本已移入已采集待送检队列`);
   };
 
+  // 过滤后的待采集与已采集列表（结合近期时段与搜索关键字）
+  const filteredPending = pendingSamples.filter((item) => {
+    if (tableSearch.trim()) {
+      const kw = tableSearch.trim().toLowerCase();
+      const matchKw =
+        item.name.toLowerCase().includes(kw) ||
+        item.patientId.toLowerCase().includes(kw) ||
+        item.testItem.toLowerCase().includes(kw) ||
+        item.barcode.includes(kw) ||
+        item.department.toLowerCase().includes(kw) ||
+        item.doctor.toLowerCase().includes(kw);
+      if (!matchKw) return false;
+    }
+    if (dateFilterMode !== 'all' && startDate && endDate) {
+      const start = startDate.length === 16 ? startDate + ':00' : startDate;
+      const end = endDate.length === 16 ? endDate + ':59' : endDate;
+      if (item.applyTime < start || item.applyTime > end) return false;
+    }
+    return true;
+  });
+
+  const filteredCollected = collectedSamples.filter((item) => {
+    if (tableSearch.trim()) {
+      const kw = tableSearch.trim().toLowerCase();
+      const matchKw =
+        item.name.toLowerCase().includes(kw) ||
+        item.patientId.toLowerCase().includes(kw) ||
+        item.testItem.toLowerCase().includes(kw) ||
+        item.barcode.includes(kw) ||
+        item.department.toLowerCase().includes(kw) ||
+        item.doctor.toLowerCase().includes(kw);
+      if (!matchKw) return false;
+    }
+    if (dateFilterMode !== 'all' && startDate && endDate) {
+      const start = startDate.length === 16 ? startDate + ':00' : startDate;
+      const end = endDate.length === 16 ? endDate + ':59' : endDate;
+      if (item.applyTime < start || item.applyTime > end) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Top Action Ribbon matching screenshot functionality */}
@@ -189,8 +285,42 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* 近期开单时段筛选器 */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* 近期快捷时段切换 */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+            <button
+              onClick={() => handleApplyDatePreset('today')}
+              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                dateFilterMode === 'today'
+                  ? 'bg-white text-sky-700 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              今日 (11-11)
+            </button>
+            <button
+              onClick={() => handleApplyDatePreset('recent')}
+              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                dateFilterMode === 'recent'
+                  ? 'bg-white text-sky-700 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              近2日
+            </button>
+            <button
+              onClick={() => handleApplyDatePreset('all')}
+              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                dateFilterMode === 'all'
+                  ? 'bg-white text-sky-700 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              全部
+            </button>
+          </div>
+
+          {/* 开单时段输入 */}
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
             <span className="text-slate-500 font-medium flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-sky-600" />
@@ -199,15 +329,21 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
             <input
               type="text"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-34 h-6 px-1.5 border border-slate-300 rounded text-xs font-mono bg-white text-slate-800 focus:outline-none focus:border-sky-500"
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setDateFilterMode('recent');
+              }}
+              className="w-32 h-6 px-1.5 border border-slate-300 rounded text-xs font-mono bg-white text-slate-800 focus:outline-none focus:border-sky-500"
             />
             <span className="text-slate-400">~</span>
             <input
               type="text"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-34 h-6 px-1.5 border border-slate-300 rounded text-xs font-mono bg-white text-slate-800 focus:outline-none focus:border-sky-500"
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setDateFilterMode('recent');
+              }}
+              className="w-32 h-6 px-1.5 border border-slate-300 rounded text-xs font-mono bg-white text-slate-800 focus:outline-none focus:border-sky-500"
             />
             <button
               onClick={() => triggerAction(`已按近期时段 ${startDate} ~ ${endDate} 刷新门诊采血记录`)}
@@ -218,7 +354,11 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
           </div>
 
           <button
-            onClick={() => triggerAction('门诊采集队列数据已实时刷新')}
+            onClick={() => {
+              setPendingSamples(MOCK_PENDING_SAMPLES);
+              setCollectedSamples(MOCK_COLLECTED_SAMPLES);
+              triggerAction('门诊采集队列数据已实时刷新');
+            }}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white"
             title="刷新数据"
           >
@@ -254,11 +394,14 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="请输入或刷卡..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSearchPatient();
+                  }}
+                  placeholder="输入姓名/就诊号/条码回车查询..."
                   className="w-full text-xs pl-9 pr-20 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-sky-500 font-mono"
                 />
                 <button
-                  onClick={() => triggerAction(`正在检索患者信息: ${searchQuery}`)}
+                  onClick={() => handleSearchPatient()}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs bg-sky-600 text-white rounded font-medium hover:bg-sky-700"
                 >
                   查询
@@ -267,22 +410,32 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
             </div>
 
             {/* Patient details */}
-            <div className="grid grid-cols-2 gap-3 pt-2 text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200/70 font-mono">
-              <div>
-                <span className="text-slate-400 font-sans block text-[11px]">就诊号</span>
-                <span className="font-bold text-slate-900">{patient.outpatientNo}</span>
+            <div className="space-y-2.5">
+              <div className="grid grid-cols-2 gap-3 pt-2 text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200/70 font-mono">
+                <div>
+                  <span className="text-slate-400 font-sans block text-[11px]">就诊号</span>
+                  <span className="font-bold text-slate-900">{patient.outpatientNo}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-sans block text-[11px]">姓名</span>
+                  <span className="font-bold text-rose-600 text-sm">{patient.name}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-sans block text-[11px]">性别 / 年龄</span>
+                  <span>{patient.gender} · {patient.age}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-sans block text-[11px]">职业 / 电话</span>
+                  <span>{patient.phone}</span>
+                </div>
               </div>
-              <div>
-                <span className="text-slate-400 font-sans block text-[11px]">姓名</span>
-                <span className="font-bold text-rose-600 text-sm">{patient.name}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 font-sans block text-[11px]">性别 / 年龄</span>
-                <span>{patient.gender} · {patient.age}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 font-sans block text-[11px]">职业 / 电话</span>
-                <span>{patient.phone}</span>
+
+              {/* Patient Pending Count Chip */}
+              <div className="flex items-center justify-between text-xs text-sky-800 bg-sky-50/70 px-3 py-1.5 rounded-lg border border-sky-100 font-sans">
+                <span className="text-slate-600">当前患者待采项目：</span>
+                <span className="font-bold text-sky-700 font-mono">
+                  {pendingSamples.filter(s => s.name === patient.name || s.patientId === patient.outpatientNo).length} 份标本
+                </span>
               </div>
             </div>
           </div>
@@ -323,8 +476,23 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {MOCK_REJECTED_SAMPLES.map((r) => (
-                    <tr key={r.barcode} className="hover:bg-slate-50">
-                      <td className="p-2 text-center">
+                    <tr
+                      key={r.barcode}
+                      className="hover:bg-slate-50 cursor-pointer"
+                      onClick={() => {
+                        setPatient({
+                          outpatientNo: r.patientId,
+                          name: r.name,
+                          gender: r.gender,
+                          age: r.age,
+                          profession: '门诊复采/让步检验',
+                          phone: '136****' + r.barcode.slice(-4),
+                        });
+                        setSearchQuery(r.patientId);
+                        triggerAction(`已定位拒收标本患者: ${r.name}，原因: ${r.rejectReason}`);
+                      }}
+                    >
+                      <td className="p-2 text-center" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" defaultChecked className="rounded" />
                       </td>
                       <td className="p-2 font-mono text-slate-800">{r.barcode}</td>
@@ -346,7 +514,7 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                 <HelpCircle className="w-4 h-4 text-amber-600" />
                 <h3 className="font-bold text-slate-900 text-xs">未收费列表 (待缴费)</h3>
               </div>
-              <span className="text-[11px] text-amber-800 font-mono">共 2 项待缴费</span>
+              <span className="text-[11px] text-amber-800 font-mono">共 {MOCK_UNPAID_SAMPLES.length} 项待缴费</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -359,7 +527,22 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {MOCK_UNPAID_SAMPLES.map((u) => (
-                    <tr key={u.barcode} className="hover:bg-slate-50">
+                    <tr
+                      key={u.barcode}
+                      className="hover:bg-slate-50 cursor-pointer"
+                      onClick={() => {
+                        setPatient({
+                          outpatientNo: u.patientId,
+                          name: u.name,
+                          gender: u.gender,
+                          age: u.age,
+                          profession: '门诊自费/待缴费',
+                          phone: '137****' + u.barcode.slice(-4),
+                        });
+                        setSearchQuery(u.patientId);
+                        triggerAction(`已选中待缴费患者: ${u.name}，项目：${u.testItem}`);
+                      }}
+                    >
                       <td className="p-2">
                         <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-medium">
                           {u.feeStatus}
@@ -390,7 +573,7 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                       : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  待采集列表 ({pendingSamples.length})
+                  待采集列表 ({filteredPending.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('collected')}
@@ -400,7 +583,7 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                       : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  已采集列表 ({collectedSamples.length})
+                  已采集列表 ({filteredCollected.length})
                 </button>
               </div>
 
@@ -434,7 +617,7 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                     type="text"
                     value={tableSearch}
                     onChange={(e) => setTableSearch(e.target.value)}
-                    placeholder="姓名、病历号快速过滤..."
+                    placeholder="姓名、科室、项目快速过滤..."
                     className="text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-md outline-none focus:border-sky-500 w-48"
                   />
                 </div>
@@ -450,7 +633,7 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                       <th className="px-3 py-2.5 w-10 text-center">
                         <input
                           type="checkbox"
-                          checked={pendingSamples.length > 0 && selectedPendingBarcodes.length === pendingSamples.length}
+                          checked={filteredPending.length > 0 && filteredPending.every(s => selectedPendingBarcodes.includes(s.barcode))}
                           onChange={handleSelectAllPending}
                           className="rounded"
                         />
@@ -470,100 +653,122 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {pendingSamples
-                      .filter((item) => {
-                        if (!tableSearch.trim()) return true;
-                        const kw = tableSearch.trim().toLowerCase();
+                    {filteredPending.length === 0 ? (
+                      <tr>
+                        <td colSpan={13} className="py-8 text-center text-slate-400 text-xs">
+                          当前筛选时段下暂无符合条件的门诊待采集标本
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPending.map((item) => {
+                        const isChecked = selectedPendingBarcodes.includes(item.barcode);
                         return (
-                          item.name.toLowerCase().includes(kw) ||
-                          item.patientId.toLowerCase().includes(kw) ||
-                          item.testItem.toLowerCase().includes(kw) ||
-                          item.barcode.includes(kw)
-                        );
-                      })
-                      .map((item) => {
-                      const isChecked = selectedPendingBarcodes.includes(item.barcode);
-                      return (
-                        <tr
-                          key={item.barcode}
-                          className={`hover:bg-sky-50/50 transition-colors cursor-pointer ${
-                            isChecked ? 'bg-sky-50/80' : ''
-                          }`}
-                          onClick={() => handleTogglePending(item.barcode)}
-                        >
-                          <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleTogglePending(item.barcode)}
-                              className="rounded"
-                            />
-                          </td>
-                          <td className="px-2.5 py-2.5">
-                            {item.isEmergency && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold">
-                                急
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                                item.feeStatus === '已收费'
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-amber-50 text-amber-700'
-                              }`}
-                            >
-                              {item.feeStatus}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 flex items-center gap-1.5 text-slate-700">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
-                            <span>{item.container}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-700">{item.collectionMethod}</td>
-                          <td className="px-3 py-2.5 font-medium text-slate-900">{item.specimen}</td>
-                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
-                          <td className="px-3 py-2.5 text-slate-600">{item.department}</td>
-                          <td className="px-3 py-2.5 text-slate-600">{item.doctor}</td>
-                          <td className="px-3 py-2.5 font-mono text-slate-500">{item.applyTime}</td>
-                          <td className="px-3 py-2.5 text-slate-600">检验科</td>
-                          <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">
-                            <div className="flex items-center gap-1">
-                              <span>{item.barcode}</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCopy(item.barcode);
-                                }}
-                                className="p-0.5 hover:bg-slate-200 rounded"
-                                title="复制条码"
-                              >
-                                {copiedCode === item.barcode ? (
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                ) : (
-                                  <Copy className="w-3 h-3 text-slate-400" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                          <td
-                            className="px-3 py-2.5 text-center"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setGuidanceSample(item);
+                          <tr
+                            key={item.barcode}
+                            className={`hover:bg-sky-50/50 transition-colors cursor-pointer ${
+                              isChecked ? 'bg-sky-50/80' : ''
+                            }`}
+                            onClick={() => {
+                              handleTogglePending(item.barcode);
+                              setPatient({
+                                outpatientNo: item.patientId,
+                                name: item.name,
+                                gender: item.gender,
+                                age: item.age,
+                                profession: '门诊自费/医保',
+                                phone: '138****' + item.barcode.slice(-4),
+                              });
+                              setSearchQuery(item.patientId);
                             }}
                           >
-                            <button
-                              className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-100 transition-colors"
-                              title="查看采集指南与注意事项"
+                            <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleTogglePending(item.barcode)}
+                                className="rounded"
+                              />
+                            </td>
+                            <td className="px-2.5 py-2.5">
+                              {item.isEmergency && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold animate-pulse">
+                                  急
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                                  item.feeStatus === '已收费'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200/70'
+                                }`}
+                              >
+                                {item.feeStatus}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 flex items-center gap-1.5 text-slate-700">
+                              <span
+                                className={`w-2.5 h-2.5 rounded-full inline-block ${
+                                  item.container.includes('紫')
+                                    ? 'bg-purple-500'
+                                    : item.container.includes('黄')
+                                    ? 'bg-amber-400'
+                                    : item.container.includes('蓝')
+                                    ? 'bg-sky-500'
+                                    : item.container.includes('绿')
+                                    ? 'bg-emerald-500'
+                                    : item.container.includes('红')
+                                    ? 'bg-rose-500'
+                                    : 'bg-slate-400'
+                                }`}
+                              />
+                              <span>{item.container}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-700">{item.collectionMethod}</td>
+                            <td className="px-3 py-2.5 font-medium text-slate-900">{item.specimen}</td>
+                            <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
+                            <td className="px-3 py-2.5 text-slate-600">{item.department}</td>
+                            <td className="px-3 py-2.5 text-slate-600">{item.doctor}</td>
+                            <td className="px-3 py-2.5 font-mono text-slate-500">{item.applyTime}</td>
+                            <td className="px-3 py-2.5 text-slate-600">检验科</td>
+                            <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">
+                              <div className="flex items-center gap-1">
+                                <span>{item.barcode}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopy(item.barcode);
+                                  }}
+                                  className="p-0.5 hover:bg-slate-200 rounded"
+                                  title="复制条码"
+                                >
+                                  {copiedCode === item.barcode ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3 text-slate-400" />
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                            <td
+                              className="px-3 py-2.5 text-center"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setGuidanceSample(item);
+                              }}
                             >
-                              <HelpCircle className="w-4 h-4 mx-auto" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              <button
+                                className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-100 transition-colors"
+                                title="查看采集指南与注意事项"
+                              >
+                                <HelpCircle className="w-4 h-4 mx-auto" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -593,44 +798,55 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {collectedSamples
-                      .filter((item) => {
-                        if (!tableSearch.trim()) return true;
-                        const kw = tableSearch.trim().toLowerCase();
-                        return (
-                          item.name.toLowerCase().includes(kw) ||
-                          item.patientId.toLowerCase().includes(kw) ||
-                          item.testItem.toLowerCase().includes(kw) ||
-                          item.barcode.includes(kw)
-                        );
-                      })
-                      .map((item) => (
-                      <tr key={item.barcode} className="hover:bg-slate-50">
-                        <td className="px-3 py-2.5 text-center">
-                          <input type="checkbox" className="rounded" />
+                    {filteredCollected.length === 0 ? (
+                      <tr>
+                        <td colSpan={13} className="py-8 text-center text-slate-400 text-xs">
+                          当前筛选时段下暂无已采集标本记录
                         </td>
-                        <td className="px-2.5 py-2.5">
-                          {item.isEmergency && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold">
-                              急
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-slate-700">{item.container}</td>
-                        <td className="px-3 py-2.5 text-slate-900">{item.specimen}</td>
-                        <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
-                        <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">{item.barcode}</td>
-                        <td className="px-3 py-2.5 font-bold text-slate-900">{item.name}</td>
-                        <td className="px-3 py-2.5 text-slate-600">{item.gender}</td>
-                        <td className="px-3 py-2.5 font-mono font-semibold text-slate-800">
-                          {item.specimen === '血清' ? '85' : item.specimen === '全血' ? '25' : '45'}
-                        </td>
-                        <td className="px-3 py-2.5 text-slate-600">{item.department}</td>
-                        <td className="px-3 py-2.5 text-slate-600">{item.doctor}</td>
-                        <td className="px-3 py-2.5 font-mono text-slate-500">{item.applyTime}</td>
-                        <td className="px-3 py-2.5 text-slate-600">{item.collectionMethod}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredCollected.map((item) => (
+                        <tr
+                          key={item.barcode}
+                          className="hover:bg-slate-50 cursor-pointer"
+                          onClick={() => {
+                            setPatient({
+                              outpatientNo: item.patientId,
+                              name: item.name,
+                              gender: item.gender,
+                              age: item.age,
+                              profession: '门诊自费/医保',
+                              phone: '139****' + item.barcode.slice(-4),
+                            });
+                            setSearchQuery(item.patientId);
+                          }}
+                        >
+                          <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input type="checkbox" className="rounded" />
+                          </td>
+                          <td className="px-2.5 py-2.5">
+                            {item.isEmergency && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold">
+                                急
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-700">{item.container}</td>
+                          <td className="px-3 py-2.5 text-slate-900">{item.specimen}</td>
+                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
+                          <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">{item.barcode}</td>
+                          <td className="px-3 py-2.5 font-bold text-slate-900">{item.name}</td>
+                          <td className="px-3 py-2.5 text-slate-600">{item.gender}</td>
+                          <td className="px-3 py-2.5 font-mono font-semibold text-slate-800">
+                            {item.specimen === '血清' ? '85' : item.specimen === '全血' ? '25' : '45'}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-600">{item.department}</td>
+                          <td className="px-3 py-2.5 text-slate-600">{item.doctor}</td>
+                          <td className="px-3 py-2.5 font-mono text-slate-500">{item.applyTime}</td>
+                          <td className="px-3 py-2.5 text-slate-600">{item.collectionMethod}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

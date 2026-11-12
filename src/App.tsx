@@ -15,8 +15,8 @@ import { NotificationModal } from './components/NotificationModal';
 import { LoginPage } from './components/LoginPage';
 
 export default function App() {
-  const [activeMenuId, setActiveMenuId] = useState<string>('consumables-management');
-  const [activeSubMenuId, setActiveSubMenuId] = useState<string | null>('reagent-stat-analysis');
+  const [activeMenuId, setActiveMenuId] = useState<string>('specimen-pretreatment');
+  const [activeSubMenuId, setActiveSubMenuId] = useState<string | null>('spec-outpatient');
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [theme, setTheme] = useState<SidebarTheme>('medical-blue');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(true);
