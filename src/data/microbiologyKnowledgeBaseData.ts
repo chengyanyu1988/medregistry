@@ -1,0 +1,396 @@
+export type MicroKnowledgeType = '微生物知识库' | '抗生素知识库' | '药敏试验标准';
+
+export interface MicrobeKnowledgeItem {
+  id: string;
+  chineseName: string; // 中文名称
+  englishName: string; // 英文名称 / 拉丁名
+  parentName: string; // 上级名称 (纲/目/科/属)
+  whonetCode: string; // WHONET码
+  taxonCategory: '门' | '纲' | '目' | '科' | '属' | '种' | '亚种'; // 生物类别
+  updater: string; // 维护人员 (真实姓名)
+  updateTime: string; // 更新时间 (近期时间 2026年10月)
+  gramStain?: '革兰阳性' | '革兰阴性' | '抗酸染色' | '真菌'; // 染色特性
+  clinicalSignificance?: string; // 临床意义 / 致病特征
+}
+
+export interface AntibioticKnowledgeItem {
+  id: string;
+  chineseName: string; // 中文名称
+  englishName: string; // 英文名称
+  category: string; // 药物大类
+  whonetCode: string; // WHONET码
+  route: '静脉滴注' | '口服' | '静脉注射' | '肌内注射' | '外用'; // 给药途径
+  updater: string; // 维护人员
+  updateTime: string; // 更新时间
+  spectrum?: string; // 抗菌谱简述
+}
+
+export interface AstStandardKnowledgeItem {
+  id: string;
+  standardOrg: string; // 标准体系 (如 CLSI M100 第34版, EUCAST 2026)
+  organismGroup: string; // 菌群大类 (如 肠杆菌目, 假单胞菌属, 葡萄球菌属)
+  antibioticName: string; // 抗菌药物
+  method: 'KB (纸片扩散法)' | 'MIC (微量肉汤稀释法)' | 'E-test'; // 测试方法
+  susceptibleBreak: string; // 敏感 (S) 折点
+  intermediateBreak: string; // 中介 (I) 折点
+  resistantBreak: string; // 耐药 (R) 折点
+  sddBreak?: string; // 剂量依赖敏感 (SDD)
+  updater: string; // 维护人员
+  updateTime: string; // 更新时间
+}
+
+export const INITIAL_MICROBE_LIST: MicrobeKnowledgeItem[] = [
+  {
+    id: 'mb-01',
+    chineseName: '革兰阳性杆菌',
+    englishName: 'Gram positive rods',
+    parentName: '厚壁菌门',
+    whonetCode: 'GPR',
+    taxonCategory: '属',
+    updater: '李晓红主管检验师',
+    updateTime: '2026-10-28 10:15:20',
+    gramStain: '革兰阳性',
+    clinicalSignificance: '包含芽孢杆菌属、棒状杆菌属及李斯特菌属等条件致病与特异致病菌群',
+  },
+  {
+    id: 'mb-02',
+    chineseName: '蜂房类芽孢杆菌',
+    englishName: 'Paenibacillus alvei',
+    parentName: '革兰阳性杆菌',
+    whonetCode: 'PA',
+    taxonCategory: '种',
+    updater: '刘浩然检验师',
+    updateTime: '2026-10-28 10:20:15',
+    gramStain: '革兰阳性',
+    clinicalSignificance: '环境与蜜蜂共生菌，偶见于免疫力低下患者术后深部创口感染',
+  },
+  {
+    id: 'mb-03',
+    chineseName: '炭疽芽孢杆菌',
+    englishName: 'Bacillus anthracis',
+    parentName: '革兰阳性杆菌',
+    whonetCode: 'BA',
+    taxonCategory: '种',
+    updater: '郭彩霞主任医师',
+    updateTime: '2026-10-28 10:22:40',
+    gramStain: '革兰阳性',
+    clinicalSignificance: '法定甲类烈性病原体，引起皮肤、肺炭疽或肠炭疽，形成粗大链状平头杆菌',
+  },
+  {
+    id: 'mb-04',
+    chineseName: '环状芽孢杆菌',
+    englishName: 'Bacillus circulans',
+    parentName: '革兰阳性杆菌',
+    whonetCode: 'BC',
+    taxonCategory: '种',
+    updater: '魏明副主任检验师',
+    updateTime: '2026-10-28 10:25:00',
+    gramStain: '革兰阳性',
+    clinicalSignificance: '土壤腐生菌，罕见引起脑脊液或静脉留置导管相关败血症',
+  },
+  {
+    id: 'mb-05',
+    chineseName: '短杆菌属',
+    englishName: 'Brevibacterium sp.',
+    parentName: '放线菌门',
+    whonetCode: 'BS',
+    taxonCategory: '种',
+    updater: '王宇轩技师',
+    updateTime: '2026-10-28 10:30:10',
+    gramStain: '革兰阳性',
+    clinicalSignificance: '皮肤正常菌群定植，血液或腹透液培养中偶可分离出条件致病菌',
+  },
+  {
+    id: 'mb-06',
+    chineseName: '大肠埃希菌',
+    englishName: 'Escherichia coli',
+    parentName: '肠杆菌目',
+    whonetCode: 'eco',
+    taxonCategory: '种',
+    updater: '李晓红主管检验师',
+    updateTime: '2026-10-29 09:15:00',
+    gramStain: '革兰阴性',
+    clinicalSignificance: '泌尿系统感染首要致病菌，易产ESBLs与碳青霉烯酶CRE',
+  },
+  {
+    id: 'mb-07',
+    chineseName: '肺炎克雷伯菌',
+    englishName: 'Klebsiella pneumoniae',
+    parentName: '肠杆菌目',
+    whonetCode: 'kpn',
+    taxonCategory: '种',
+    updater: '刘浩然检验师',
+    updateTime: '2026-10-29 09:20:30',
+    gramStain: '革兰阴性',
+    clinicalSignificance: '医院获得性肺炎与血流感染核心耐药菌，高毒力菌株(hvKP)可致迁徙性脓肿',
+  },
+  {
+    id: 'mb-08',
+    chineseName: '金黄色葡萄球菌',
+    englishName: 'Staphylococcus aureus',
+    parentName: '葡萄球菌科',
+    whonetCode: 'sau',
+    taxonCategory: '种',
+    updater: '孙丽丽主管检验师',
+    updateTime: '2026-10-29 11:40:00',
+    gramStain: '革兰阳性',
+    clinicalSignificance: '化脓性感染常见致病菌，MRSA为院感核心监控目标',
+  },
+  {
+    id: 'mb-09',
+    chineseName: '铜绿假单胞菌',
+    englishName: 'Pseudomonas aeruginosa',
+    parentName: '假单胞菌科',
+    whonetCode: 'pae',
+    taxonCategory: '种',
+    updater: '张建国检验师',
+    updateTime: '2026-10-30 08:30:00',
+    gramStain: '革兰阴性',
+    clinicalSignificance: '非发酵菌群代表，天然对多种抗生素耐药，常见于烧伤创面与支气管扩张症',
+  },
+  {
+    id: 'mb-10',
+    chineseName: '鲍曼不动杆菌',
+    englishName: 'Acinetobacter baumannii',
+    parentName: '不动杆菌属',
+    whonetCode: 'aba',
+    taxonCategory: '种',
+    updater: '郭彩霞主任医师',
+    updateTime: '2026-10-30 08:45:00',
+    gramStain: '革兰阴性',
+    clinicalSignificance: 'ICU重症监护室呼吸机相关性肺炎常见病原体，泛耐药XDR-AB极具暴发风险',
+  },
+  {
+    id: 'mb-11',
+    chineseName: '屎肠球菌',
+    englishName: 'Enterococcus faecium',
+    parentName: '肠球菌科',
+    whonetCode: 'efa',
+    taxonCategory: '种',
+    updater: '李晓红主管检验师',
+    updateTime: '2026-10-30 09:00:00',
+    gramStain: '革兰阳性',
+    clinicalSignificance: '多重耐药VRE核心菌种，对青霉素与氨苄西林天然耐药率极高',
+  },
+  {
+    id: 'mb-12',
+    chineseName: '新型隐球菌',
+    englishName: 'Cryptococcus neoformans',
+    parentName: '银耳纲',
+    whonetCode: 'cne',
+    taxonCategory: '种',
+    updater: '魏明副主任检验师',
+    updateTime: '2026-10-30 09:15:00',
+    gramStain: '真菌',
+    clinicalSignificance: '中枢神经系统真菌性脑膜炎核心致病原，墨汁负染色见厚多糖荚膜',
+  },
+];
+
+export const INITIAL_ANTIBIOTIC_LIST: AntibioticKnowledgeItem[] = [
+  {
+    id: 'ab-01',
+    chineseName: '美罗培南',
+    englishName: 'Meropenem',
+    category: '碳青霉烯类',
+    whonetCode: 'MEM',
+    route: '静脉滴注',
+    updater: '李晓红主管检验师',
+    updateTime: '2026-10-29 14:10:00',
+    spectrum: '超广谱抗菌药，对产ESBLs与AmpC酶肠杆菌目具有极高杀菌活性',
+  },
+  {
+    id: 'ab-02',
+    chineseName: '亚胺培南/西司他丁',
+    englishName: 'Imipenem/Cilastatin',
+    category: '碳青霉烯类',
+    whonetCode: 'IPM',
+    route: '静脉滴注',
+    updater: '刘浩然检验师',
+    updateTime: '2026-10-29 14:15:30',
+    spectrum: '抗革兰阴性与阳性需氧/厌氧菌复合制剂，严重院内感染一线重症用药',
+  },
+  {
+    id: 'ab-03',
+    chineseName: '哌拉西林/他唑巴坦',
+    englishName: 'Piperacillin/Tazobactam',
+    category: 'β-内酰胺/酶抑制剂复合制剂',
+    whonetCode: 'TZP',
+    route: '静脉滴注',
+    updater: '郭彩霞主任医师',
+    updateTime: '2026-10-29 14:20:00',
+    spectrum: '抗铜绿假单胞菌及产酶革兰阴性杆菌广谱抗感染制剂',
+  },
+  {
+    id: 'ab-04',
+    chineseName: '头孢他啶',
+    englishName: 'Ceftazidime',
+    category: '第三代头孢菌素',
+    whonetCode: 'CAZ',
+    route: '静脉滴注',
+    updater: '魏明副主任检验师',
+    updateTime: '2026-10-29 14:25:00',
+    spectrum: '强抗铜绿假单胞菌活性，为呼吸道及泌尿道非发酵菌经验性治疗药物',
+  },
+  {
+    id: 'ab-05',
+    chineseName: '阿米卡星',
+    englishName: 'Amikacin',
+    category: '氨基糖苷类',
+    whonetCode: 'AMK',
+    route: '静脉滴注',
+    updater: '王宇轩技师',
+    updateTime: '2026-10-29 14:30:00',
+    spectrum: '浓度依赖性杀菌药，对大部分肠杆菌目及铜绿假单胞菌保持高度敏感',
+  },
+  {
+    id: 'ab-06',
+    chineseName: '万古霉素',
+    englishName: 'Vancomycin',
+    category: '糖肽类',
+    whonetCode: 'VAN',
+    route: '静脉滴注',
+    updater: '李晓红主管检验师',
+    updateTime: '2026-10-30 08:30:00',
+    spectrum: '抗MRSA金黄色葡萄球菌与肠球菌重症感染金标准药物',
+  },
+  {
+    id: 'ab-07',
+    chineseName: '利奈唑胺',
+    englishName: 'Linezolid',
+    category: '恶唑烷酮类',
+    whonetCode: 'LZD',
+    route: '口服',
+    updater: '刘浩然检验师',
+    updateTime: '2026-10-30 08:35:00',
+    spectrum: '抑菌剂，抑制细菌蛋白质合成，适用于VRE与复杂软组织感染',
+  },
+  {
+    id: 'ab-08',
+    chineseName: '替加环素',
+    englishName: 'Tigecycline',
+    category: '甘氨酰环素类',
+    whonetCode: 'TGC',
+    route: '静脉滴注',
+    updater: '郭彩霞主任医师',
+    updateTime: '2026-10-30 08:40:00',
+    spectrum: '针对CRKP与泛耐药鲍曼不动杆菌腹腔及肺部感染联合救治核心药物',
+  },
+  {
+    id: 'ab-09',
+    chineseName: '多粘菌素B',
+    englishName: 'Polymyxin B',
+    category: '多肽类',
+    whonetCode: 'COL',
+    route: '静脉滴注',
+    updater: '魏明副主任检验师',
+    updateTime: '2026-10-30 08:45:00',
+    spectrum: '膜结合强效杀菌剂，抗耐碳青霉烯超级革兰阴性杆菌的最后防线',
+  },
+];
+
+export const INITIAL_AST_STANDARDS_LIST: AstStandardKnowledgeItem[] = [
+  {
+    id: 'std-01',
+    standardOrg: 'CLSI M100 (第34版 2026)',
+    organismGroup: '肠杆菌目 (Enterobacterales)',
+    antibioticName: '美罗培南 (Meropenem)',
+    method: 'MIC (微量肉汤稀释法)',
+    susceptibleBreak: '≤1 ug/mL',
+    intermediateBreak: '2 ug/mL',
+    resistantBreak: '≥4 ug/mL',
+    sddBreak: '-',
+    updater: '郭彩霞主任医师',
+    updateTime: '2026-10-30 09:00:00',
+  },
+  {
+    id: 'std-02',
+    standardOrg: 'CLSI M100 (第34版 2026)',
+    organismGroup: '肠杆菌目 (Enterobacterales)',
+    antibioticName: '美罗培南 (Meropenem)',
+    method: 'KB (纸片扩散法)',
+    susceptibleBreak: '≥23 mm',
+    intermediateBreak: '20-22 mm',
+    resistantBreak: '≤19 mm',
+    sddBreak: '-',
+    updater: '郭彩霞主任医师',
+    updateTime: '2026-10-30 09:05:00',
+  },
+  {
+    id: 'std-03',
+    standardOrg: 'CLSI M100 (第34版 2026)',
+    organismGroup: '金黄色葡萄球菌 (S. aureus)',
+    antibioticName: '头孢西丁 (Cefoxitin / MRSA初筛)',
+    method: 'KB (纸片扩散法)',
+    susceptibleBreak: '≥22 mm (MSSA)',
+    intermediateBreak: '-',
+    resistantBreak: '≤21 mm (MRSA)',
+    sddBreak: '-',
+    updater: '李晓红主管检验师',
+    updateTime: '2026-10-30 09:10:00',
+  },
+  {
+    id: 'std-04',
+    standardOrg: 'CLSI M100 (第34版 2026)',
+    organismGroup: '金黄色葡萄球菌 (S. aureus)',
+    antibioticName: '万古霉素 (Vancomycin)',
+    method: 'MIC (微量肉汤稀释法)',
+    susceptibleBreak: '≤2 ug/mL (VSSA)',
+    intermediateBreak: '4-8 ug/mL (VISA)',
+    resistantBreak: '≥16 ug/mL (VRSA)',
+    sddBreak: '-',
+    updater: '魏明副主任检验师',
+    updateTime: '2026-10-30 09:15:00',
+  },
+  {
+    id: 'std-05',
+    standardOrg: 'CLSI M100 (第34版 2026)',
+    organismGroup: '铜绿假单胞菌 (P. aeruginosa)',
+    antibioticName: '头孢他啶 (Ceftazidime)',
+    method: 'MIC (微量肉汤稀释法)',
+    susceptibleBreak: '≤8 ug/mL',
+    intermediateBreak: '16 ug/mL',
+    resistantBreak: '≥32 ug/mL',
+    sddBreak: '-',
+    updater: '刘浩然检验师',
+    updateTime: '2026-10-30 09:20:00',
+  },
+  {
+    id: 'std-06',
+    standardOrg: 'CLSI M100 (第34版 2026)',
+    organismGroup: '铜绿假单胞菌 (P. aeruginosa)',
+    antibioticName: '环丙沙星 (Ciprofloxacin)',
+    method: 'KB (纸片扩散法)',
+    susceptibleBreak: '≥25 mm',
+    intermediateBreak: '19-24 mm',
+    resistantBreak: '≤18 mm',
+    sddBreak: '-',
+    updater: '王宇轩技师',
+    updateTime: '2026-10-30 09:25:00',
+  },
+  {
+    id: 'std-07',
+    standardOrg: 'EUCAST (v14.0 2026)',
+    organismGroup: '肠球菌属 (Enterococcus spp.)',
+    antibioticName: '氨苄西林 (Ampicillin)',
+    method: 'MIC (微量肉汤稀释法)',
+    susceptibleBreak: '≤4 ug/mL',
+    intermediateBreak: '-',
+    resistantBreak: '>8 ug/mL',
+    sddBreak: '-',
+    updater: '郭彩霞主任医师',
+    updateTime: '2026-10-30 09:30:00',
+  },
+  {
+    id: 'std-08',
+    standardOrg: 'CLSI M100 (第34版 2026)',
+    organismGroup: '鲍曼不动杆菌 (A. baumannii)',
+    antibioticName: '多粘菌素B (Polymyxin B)',
+    method: 'MIC (微量肉汤稀释法)',
+    susceptibleBreak: '≤2 ug/mL (中介/临床有效)',
+    intermediateBreak: '-',
+    resistantBreak: '≥4 ug/mL (耐药)',
+    sddBreak: '-',
+    updater: '李晓红主管检验师',
+    updateTime: '2026-10-30 09:35:00',
+  },
+];
