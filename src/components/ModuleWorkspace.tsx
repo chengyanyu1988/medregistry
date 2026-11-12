@@ -348,7 +348,9 @@ export const ModuleWorkspace: React.FC<ModuleWorkspaceProps> = ({
       )}
 
       {/* Dynamic Content based on Active Module */}
-      {renderModuleContent(activeMenu.id, activeSubMenu?.id, triggerAction, user, onSelectSubMenu)}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {renderModuleContent(activeMenu.id, activeSubMenu?.id, triggerAction, user, onSelectSubMenu)}
+      </div>
     </div>
   );
 };

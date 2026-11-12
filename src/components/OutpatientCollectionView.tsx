@@ -26,7 +26,15 @@ import {
   ArrowRight,
   X
 } from './MenuIcon';
-import { Barcode, Calendar, Clock } from 'lucide-react';
+import {
+  Barcode,
+  Calendar,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
+} from 'lucide-react';
 import { OutpatientManualApplyModal } from './OutpatientManualApplyModal';
 import { OutpatientBarcodeGenerateModal } from './OutpatientBarcodeGenerateModal';
 import { OutpatientBarcodePrintModal } from './OutpatientBarcodePrintModal';
@@ -73,6 +81,12 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
   // Search filter for tables
   const [tableSearch, setTableSearch] = useState('');
 
+  // 表格翻页状态配置 (默认每页显示 10 条数据)
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [pendingPage, setPendingPage] = useState<number>(1);
+  const [collectedPage, setCollectedPage] = useState<number>(1);
+  const [jumpPageInput, setJumpPageInput] = useState<string>('');
+
   // Copy state
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -118,6 +132,8 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
 
   const handleApplyDatePreset = (preset: 'today' | 'recent' | 'all') => {
     setDateFilterMode(preset);
+    setPendingPage(1);
+    setCollectedPage(1);
     if (preset === 'today') {
       setStartDate('2026-11-11 00:00');
       setEndDate('2026-11-11 23:59');
@@ -140,13 +156,7 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const handleSelectAllPending = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedPendingBarcodes(pendingSamples.map((s) => s.barcode));
-    } else {
-      setSelectedPendingBarcodes([]);
-    }
-  };
+
 
   const handleTogglePending = (barcode: string) => {
     setSelectedPendingBarcodes((prev) =>
@@ -234,10 +244,56 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
     return true;
   });
 
+  // 待采集分页计算 (每页默认 10 条)
+  const totalPending = filteredPending.length;
+  const totalPendingPages = Math.max(1, Math.ceil(totalPending / pageSize));
+  const safePendingPage = Math.min(Math.max(1, pendingPage), totalPendingPages);
+  const pagedPending = filteredPending.slice(
+    (safePendingPage - 1) * pageSize,
+    safePendingPage * pageSize
+  );
+
+  // 已采集分页计算 (每页默认 10 条)
+  const totalCollected = filteredCollected.length;
+  const totalCollectedPages = Math.max(1, Math.ceil(totalCollected / pageSize));
+  const safeCollectedPage = Math.min(Math.max(1, collectedPage), totalCollectedPages);
+  const pagedCollected = filteredCollected.slice(
+    (safeCollectedPage - 1) * pageSize,
+    safeCollectedPage * pageSize
+  );
+
+  // 当前激活 tab 的分页统计与控制
+  const currentPage = activeTab === 'pending' ? safePendingPage : safeCollectedPage;
+  const totalPages = activeTab === 'pending' ? totalPendingPages : totalCollectedPages;
+  const totalRecords = activeTab === 'pending' ? totalPending : totalCollected;
+
+  const handlePageChange = (page: number) => {
+    const valid = Math.min(Math.max(1, page), totalPages);
+    if (activeTab === 'pending') {
+      setPendingPage(valid);
+    } else {
+      setCollectedPage(valid);
+    }
+  };
+
+  const isAllCurrentPendingSelected =
+    pagedPending.length > 0 &&
+    pagedPending.every((s) => selectedPendingBarcodes.includes(s.barcode));
+
+  const handleSelectAllPending = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      const pageBarcodes = pagedPending.map((s) => s.barcode);
+      setSelectedPendingBarcodes((prev) => Array.from(new Set([...prev, ...pageBarcodes])));
+    } else {
+      const pageBarcodes = pagedPending.map((s) => s.barcode);
+      setSelectedPendingBarcodes((prev) => prev.filter((b) => !pageBarcodes.includes(b)));
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="flex-1 h-full min-h-0 flex flex-col p-4 gap-4 overflow-y-auto lg:overflow-hidden light-scrollbar">
       {/* Top Action Ribbon matching screenshot functionality */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2">
           {/* 1. 生成条码 */}
           <button
@@ -368,23 +424,23 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
       </div>
 
       {/* Main Split Layout: Left Patient Card & Lists, Right Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
         {/* Left Column: Patient Profile & Rejected/Unpaid Lists */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="lg:col-span-4 flex flex-col h-full min-h-0 overflow-y-auto light-scrollbar space-y-4 pr-0.5">
           {/* Patient Card */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs space-y-3.5 shrink-0">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center font-bold">
                   <User className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-sm">患者信息检索</h3>
+                <h3 className="font-bold text-slate-900 text-xs">患者信息检索</h3>
               </div>
               <span className="text-xs text-emerald-600 font-medium">读卡器已就绪</span>
             </div>
 
             {/* Search Input matching screenshot */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-[11px] font-semibold text-slate-500">
                 患者信息 (身份证卡 / 医保卡 / 就诊号 / 申请单号)
               </label>
@@ -410,8 +466,8 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
             </div>
 
             {/* Patient details */}
-            <div className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-3 pt-2 text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200/70 font-mono">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2.5 pt-1 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200/70 font-mono">
                 <div>
                   <span className="text-slate-400 font-sans block text-[11px]">就诊号</span>
                   <span className="font-bold text-slate-900">{patient.outpatientNo}</span>
@@ -441,8 +497,8 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
           </div>
 
           {/* Rejected List Card */}
-          <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-xs">
-            <div className="p-3.5 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between">
+          <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-xs shrink-0">
+            <div className="p-3 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-600" />
                 <h3 className="font-bold text-slate-900 text-xs">拒收列表 (需重新采样)</h3>
@@ -450,21 +506,21 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => triggerAction('已转入门诊让步检验绿色审批通道')}
-                  className="px-2 py-1 text-[11px] bg-white text-slate-700 border border-slate-200 rounded hover:bg-slate-50 font-medium"
+                  className="px-2 py-0.5 text-[11px] bg-white text-slate-700 border border-slate-200 rounded hover:bg-slate-50 font-medium"
                 >
                   让步检验
                 </button>
                 <button
                   onClick={() => triggerAction('已批量标记所选标本为重采样申请')}
-                  className="px-2 py-1 text-[11px] bg-rose-600 text-white rounded hover:bg-rose-700 font-medium"
+                  className="px-2 py-0.5 text-[11px] bg-rose-600 text-white rounded hover:bg-rose-700 font-medium"
                 >
                   重采样本
                 </button>
               </div>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-48 light-scrollbar">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0 bg-slate-50 z-10">
                   <tr>
                     <th className="p-2 w-8 text-center">
                       <input type="checkbox" className="rounded" />
@@ -508,17 +564,17 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
           </div>
 
           {/* Unpaid List Card */}
-          <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-xs">
-            <div className="p-3.5 bg-amber-50/70 border-b border-amber-100 flex items-center justify-between">
+          <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-xs shrink-0">
+            <div className="p-3 bg-amber-50/70 border-b border-amber-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-amber-600" />
                 <h3 className="font-bold text-slate-900 text-xs">未收费列表 (待缴费)</h3>
               </div>
               <span className="text-[11px] text-amber-800 font-mono">共 {MOCK_UNPAID_SAMPLES.length} 项待缴费</span>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-48 light-scrollbar">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0 bg-slate-50 z-10">
                   <tr>
                     <th className="p-2">收费状态</th>
                     <th className="p-2">标本</th>
@@ -559,302 +615,454 @@ export const OutpatientCollectionView: React.FC<OutpatientCollectionViewProps> =
         </div>
 
         {/* Right Column: Pending Collection Table & Collected Table */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Main Table Container with Tabs */}
-          <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-xs">
-            {/* Tabs Header */}
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setActiveTab('pending')}
-                  className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'pending'
-                      ? 'bg-sky-600 text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  待采集列表 ({filteredPending.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('collected')}
-                  className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'collected'
-                      ? 'bg-sky-600 text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  已采集列表 ({filteredCollected.length})
-                </button>
-              </div>
-
-              {/* Table search toolbar */}
-              <div className="flex items-center gap-2">
-                {activeTab === 'collected' && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => triggerAction('已撤销所选标本的采集状态')}
-                      className="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50"
-                    >
-                      撤销采集
-                    </button>
-                    <button
-                      onClick={() => triggerAction('已补打回执单')}
-                      className="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50"
-                    >
-                      补打回执单
-                    </button>
-                    <button
-                      onClick={() => triggerAction('已补打条码标签')}
-                      className="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50"
-                    >
-                      补打条码
-                    </button>
-                  </div>
-                )}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={tableSearch}
-                    onChange={(e) => setTableSearch(e.target.value)}
-                    placeholder="姓名、科室、项目快速过滤..."
-                    className="text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-md outline-none focus:border-sky-500 w-48"
-                  />
-                </div>
-              </div>
+        <div className="lg:col-span-8 flex flex-col h-full min-h-0 bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
+          {/* Tabs Header */}
+          <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  activeTab === 'pending'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                待采集列表 ({filteredPending.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('collected')}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  activeTab === 'collected'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                已采集列表 ({filteredCollected.length})
+              </button>
             </div>
 
-            {/* Tab 1: Pending Table */}
-            {activeTab === 'pending' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="px-3 py-2.5 w-10 text-center">
-                        <input
-                          type="checkbox"
-                          checked={filteredPending.length > 0 && filteredPending.every(s => selectedPendingBarcodes.includes(s.barcode))}
-                          onChange={handleSelectAllPending}
-                          className="rounded"
-                        />
-                      </th>
-                      <th className="px-2.5 py-2.5 text-rose-600 font-bold">急</th>
-                      <th className="px-3 py-2.5">收费</th>
-                      <th className="px-3 py-2.5">容器</th>
-                      <th className="px-3 py-2.5">采集方式</th>
-                      <th className="px-3 py-2.5">标本</th>
-                      <th className="px-3.5 py-2.5">申请项目</th>
-                      <th className="px-3 py-2.5">患者科室</th>
-                      <th className="px-3 py-2.5">申请医生</th>
-                      <th className="px-3 py-2.5">申请时间</th>
-                      <th className="px-3 py-2.5">执行科室</th>
-                      <th className="px-3.5 py-2.5 font-mono">条码号</th>
-                      <th className="px-3 py-2.5 text-center">采集指南</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredPending.length === 0 ? (
-                      <tr>
-                        <td colSpan={13} className="py-8 text-center text-slate-400 text-xs">
-                          当前筛选时段下暂无符合条件的门诊待采集标本
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredPending.map((item) => {
-                        const isChecked = selectedPendingBarcodes.includes(item.barcode);
-                        return (
-                          <tr
-                            key={item.barcode}
-                            className={`hover:bg-sky-50/50 transition-colors cursor-pointer ${
-                              isChecked ? 'bg-sky-50/80' : ''
-                            }`}
-                            onClick={() => {
-                              handleTogglePending(item.barcode);
-                              setPatient({
-                                outpatientNo: item.patientId,
-                                name: item.name,
-                                gender: item.gender,
-                                age: item.age,
-                                profession: '门诊自费/医保',
-                                phone: '138****' + item.barcode.slice(-4),
-                              });
-                              setSearchQuery(item.patientId);
-                            }}
-                          >
-                            <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => handleTogglePending(item.barcode)}
-                                className="rounded"
-                              />
-                            </td>
-                            <td className="px-2.5 py-2.5">
-                              {item.isEmergency && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold animate-pulse">
-                                  急
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                                  item.feeStatus === '已收费'
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
-                                    : 'bg-amber-50 text-amber-700 border border-amber-200/70'
-                                }`}
-                              >
-                                {item.feeStatus}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2.5 flex items-center gap-1.5 text-slate-700">
-                              <span
-                                className={`w-2.5 h-2.5 rounded-full inline-block ${
-                                  item.container.includes('紫')
-                                    ? 'bg-purple-500'
-                                    : item.container.includes('黄')
-                                    ? 'bg-amber-400'
-                                    : item.container.includes('蓝')
-                                    ? 'bg-sky-500'
-                                    : item.container.includes('绿')
-                                    ? 'bg-emerald-500'
-                                    : item.container.includes('红')
-                                    ? 'bg-rose-500'
-                                    : 'bg-slate-400'
-                                }`}
-                              />
-                              <span>{item.container}</span>
-                            </td>
-                            <td className="px-3 py-2.5 text-slate-700">{item.collectionMethod}</td>
-                            <td className="px-3 py-2.5 font-medium text-slate-900">{item.specimen}</td>
-                            <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
-                            <td className="px-3 py-2.5 text-slate-600">{item.department}</td>
-                            <td className="px-3 py-2.5 text-slate-600">{item.doctor}</td>
-                            <td className="px-3 py-2.5 font-mono text-slate-500">{item.applyTime}</td>
-                            <td className="px-3 py-2.5 text-slate-600">检验科</td>
-                            <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">
-                              <div className="flex items-center gap-1">
-                                <span>{item.barcode}</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCopy(item.barcode);
-                                  }}
-                                  className="p-0.5 hover:bg-slate-200 rounded"
-                                  title="复制条码"
-                                >
-                                  {copiedCode === item.barcode ? (
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                  ) : (
-                                    <Copy className="w-3 h-3 text-slate-400" />
-                                  )}
-                                </button>
-                              </div>
-                            </td>
-                            <td
-                              className="px-3 py-2.5 text-center"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setGuidanceSample(item);
-                              }}
-                            >
-                              <button
-                                className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-100 transition-colors"
-                                title="查看采集指南与注意事项"
-                              >
-                                <HelpCircle className="w-4 h-4 mx-auto" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+            {/* Table search toolbar */}
+            <div className="flex items-center gap-2">
+              {activeTab === 'collected' && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => triggerAction('已撤销所选标本的采集状态')}
+                    className="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50"
+                  >
+                    撤销采集
+                  </button>
+                  <button
+                    onClick={() => triggerAction('已补打回执单')}
+                    className="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50"
+                  >
+                    补打回执单
+                  </button>
+                  <button
+                    onClick={() => triggerAction('已补打条码标签')}
+                    className="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50"
+                  >
+                    补打条码
+                  </button>
+                </div>
+              )}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={tableSearch}
+                  onChange={(e) => {
+                    setTableSearch(e.target.value);
+                    setPendingPage(1);
+                    setCollectedPage(1);
+                  }}
+                  placeholder="姓名、科室、项目快速过滤..."
+                  className="text-xs pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-md outline-none focus:border-sky-500 w-48"
+                />
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Tab 2: Collected Table */}
-            {activeTab === 'collected' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
+          {/* Tab 1: Pending Table */}
+          {activeTab === 'pending' && (
+            <div className="flex-1 min-h-0 overflow-auto light-scrollbar">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100/90 text-slate-600 font-semibold border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-2xs">
+                  <tr>
+                    <th className="px-3 py-2.5 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllCurrentPendingSelected}
+                        onChange={handleSelectAllPending}
+                        className="rounded"
+                      />
+                    </th>
+                    <th className="px-2.5 py-2.5 text-rose-600 font-bold">急</th>
+                    <th className="px-3 py-2.5">收费</th>
+                    <th className="px-3 py-2.5">容器</th>
+                    <th className="px-3 py-2.5">采集方式</th>
+                    <th className="px-3 py-2.5">标本</th>
+                    <th className="px-3.5 py-2.5">申请项目</th>
+                    <th className="px-3 py-2.5">患者科室</th>
+                    <th className="px-3 py-2.5">申请医生</th>
+                    <th className="px-3 py-2.5">申请时间</th>
+                    <th className="px-3 py-2.5">执行科室</th>
+                    <th className="px-3.5 py-2.5 font-mono">条码号</th>
+                    <th className="px-3 py-2.5 text-center">采集指南</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredPending.length === 0 ? (
                     <tr>
-                      <th className="px-3 py-2.5 w-10 text-center">
-                        <input type="checkbox" className="rounded" />
-                      </th>
-                      <th className="px-2.5 py-2.5 text-rose-600 font-bold">急</th>
-                      <th className="px-3 py-2.5">容器</th>
-                      <th className="px-3 py-2.5">标本</th>
-                      <th className="px-3.5 py-2.5">申请项目</th>
-                      <th className="px-3.5 py-2.5 font-mono">条码号</th>
-                      <th className="px-3 py-2.5">姓名</th>
-                      <th className="px-3 py-2.5">性别</th>
-                      <th className="px-3 py-2.5 font-mono">金额(元)</th>
-                      <th className="px-3 py-2.5">申请科室</th>
-                      <th className="px-3 py-2.5">申请医生</th>
-                      <th className="px-3 py-2.5">申请时间</th>
-                      <th className="px-3 py-2.5">采集方式</th>
+                      <td colSpan={13} className="py-8 text-center text-slate-400 text-xs">
+                        当前筛选时段下暂无符合条件的门诊待采集标本
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredCollected.length === 0 ? (
-                      <tr>
-                        <td colSpan={13} className="py-8 text-center text-slate-400 text-xs">
-                          当前筛选时段下暂无已采集标本记录
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredCollected.map((item) => (
+                  ) : (
+                    pagedPending.map((item) => {
+                      const isChecked = selectedPendingBarcodes.includes(item.barcode);
+                      return (
                         <tr
                           key={item.barcode}
-                          className="hover:bg-slate-50 cursor-pointer"
+                          className={`hover:bg-sky-50/50 transition-colors cursor-pointer ${
+                            isChecked ? 'bg-sky-50/80' : ''
+                          }`}
                           onClick={() => {
+                            handleTogglePending(item.barcode);
                             setPatient({
                               outpatientNo: item.patientId,
                               name: item.name,
                               gender: item.gender,
                               age: item.age,
                               profession: '门诊自费/医保',
-                              phone: '139****' + item.barcode.slice(-4),
+                              phone: '138****' + item.barcode.slice(-4),
                             });
                             setSearchQuery(item.patientId);
                           }}
                         >
                           <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                            <input type="checkbox" className="rounded" />
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleTogglePending(item.barcode)}
+                              className="rounded"
+                            />
                           </td>
                           <td className="px-2.5 py-2.5">
                             {item.isEmergency && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold animate-pulse">
                                 急
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-2.5 text-slate-700">{item.container}</td>
-                          <td className="px-3 py-2.5 text-slate-900">{item.specimen}</td>
-                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
-                          <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">{item.barcode}</td>
-                          <td className="px-3 py-2.5 font-bold text-slate-900">{item.name}</td>
-                          <td className="px-3 py-2.5 text-slate-600">{item.gender}</td>
-                          <td className="px-3 py-2.5 font-mono font-semibold text-slate-800">
-                            {item.specimen === '血清' ? '85' : item.specimen === '全血' ? '25' : '45'}
+                          <td className="px-3 py-2.5">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                                item.feeStatus === '已收费'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200/70'
+                              }`}
+                            >
+                              {item.feeStatus}
+                            </span>
                           </td>
+                          <td className="px-3 py-2.5 flex items-center gap-1.5 text-slate-700">
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full inline-block ${
+                                item.container.includes('紫')
+                                  ? 'bg-purple-500'
+                                  : item.container.includes('黄')
+                                  ? 'bg-amber-400'
+                                  : item.container.includes('蓝')
+                                  ? 'bg-sky-500'
+                                  : item.container.includes('绿')
+                                  ? 'bg-emerald-500'
+                                  : item.container.includes('红')
+                                  ? 'bg-rose-500'
+                                  : 'bg-slate-400'
+                              }`}
+                            />
+                            <span>{item.container}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-700">{item.collectionMethod}</td>
+                          <td className="px-3 py-2.5 font-medium text-slate-900">{item.specimen}</td>
+                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
                           <td className="px-3 py-2.5 text-slate-600">{item.department}</td>
                           <td className="px-3 py-2.5 text-slate-600">{item.doctor}</td>
                           <td className="px-3 py-2.5 font-mono text-slate-500">{item.applyTime}</td>
-                          <td className="px-3 py-2.5 text-slate-600">{item.collectionMethod}</td>
+                          <td className="px-3 py-2.5 text-slate-600">检验科</td>
+                          <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">
+                            <div className="flex items-center gap-1">
+                              <span>{item.barcode}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(item.barcode);
+                                }}
+                                className="p-0.5 hover:bg-slate-200 rounded"
+                                title="复制条码"
+                              >
+                                {copiedCode === item.barcode ? (
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3 h-3 text-slate-400" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                          <td
+                            className="px-3 py-2.5 text-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setGuidanceSample(item);
+                            }}
+                          >
+                            <button
+                              className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-100 transition-colors"
+                              title="查看采集指南与注意事项"
+                            >
+                              <HelpCircle className="w-4 h-4 mx-auto" />
+                            </button>
+                          </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Tab 2: Collected Table */}
+          {activeTab === 'collected' && (
+            <div className="flex-1 min-h-0 overflow-auto light-scrollbar">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100/90 text-slate-600 font-semibold border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-2xs">
+                  <tr>
+                    <th className="px-3 py-2.5 w-10 text-center">
+                      <input type="checkbox" className="rounded" />
+                    </th>
+                    <th className="px-2.5 py-2.5 text-rose-600 font-bold">急</th>
+                    <th className="px-3 py-2.5">容器</th>
+                    <th className="px-3 py-2.5">标本</th>
+                    <th className="px-3.5 py-2.5">申请项目</th>
+                    <th className="px-3.5 py-2.5 font-mono">条码号</th>
+                    <th className="px-3 py-2.5">姓名</th>
+                    <th className="px-3 py-2.5">性别</th>
+                    <th className="px-3 py-2.5 font-mono">金额(元)</th>
+                    <th className="px-3 py-2.5">申请科室</th>
+                    <th className="px-3 py-2.5">申请医生</th>
+                    <th className="px-3 py-2.5">申请时间</th>
+                    <th className="px-3 py-2.5">采集方式</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredCollected.length === 0 ? (
+                    <tr>
+                      <td colSpan={13} className="py-8 text-center text-slate-400 text-xs">
+                        当前筛选时段下暂无已采集标本记录
+                      </td>
+                    </tr>
+                  ) : (
+                    pagedCollected.map((item) => (
+                      <tr
+                        key={item.barcode}
+                        className="hover:bg-slate-50 cursor-pointer"
+                        onClick={() => {
+                          setPatient({
+                            outpatientNo: item.patientId,
+                            name: item.name,
+                            gender: item.gender,
+                            age: item.age,
+                            profession: '门诊自费/医保',
+                            phone: '139****' + item.barcode.slice(-4),
+                          });
+                          setSearchQuery(item.patientId);
+                        }}
+                      >
+                        <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" className="rounded" />
+                        </td>
+                        <td className="px-2.5 py-2.5">
+                          {item.isEmergency && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 text-white font-bold">
+                              急
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-700">{item.container}</td>
+                        <td className="px-3 py-2.5 text-slate-900">{item.specimen}</td>
+                        <td className="px-3.5 py-2.5 font-semibold text-slate-900">{item.testItem}</td>
+                        <td className="px-3.5 py-2.5 font-mono font-medium text-sky-700">{item.barcode}</td>
+                        <td className="px-3 py-2.5 font-bold text-slate-900">{item.name}</td>
+                        <td className="px-3 py-2.5 text-slate-600">{item.gender}</td>
+                        <td className="px-3 py-2.5 font-mono font-semibold text-slate-800">
+                          {item.specimen === '血清' ? '85' : item.specimen === '全血' ? '25' : '45'}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-600">{item.department}</td>
+                        <td className="px-3 py-2.5 text-slate-600">{item.doctor}</td>
+                        <td className="px-3 py-2.5 font-mono text-slate-500">{item.applyTime}</td>
+                        <td className="px-3 py-2.5 text-slate-600">{item.collectionMethod}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 专业医学检验工作台常驻固定翻页栏 (Pinned Pagination Footer Toolbar) */}
+          <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-200 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 text-xs text-slate-600 select-none shrink-0">
+            {/* 左侧：数据总量与当前范围统计 */}
+            <div className="flex items-center gap-2 text-[12px] whitespace-nowrap shrink-0">
+              <span>
+                共 <strong className="text-slate-900 font-mono text-xs">{totalRecords}</strong> 条
+              </span>
+              <span className="text-slate-300">|</span>
+              <span>
+                第 <strong className="text-sky-700 font-mono font-semibold">{totalRecords === 0 ? 0 : currentPage}</strong> / <span className="font-mono">{totalPages}</span> 页
+                （{totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1}~{Math.min(currentPage * pageSize, totalRecords)}）
+              </span>
+              {activeTab === 'pending' && selectedPendingBarcodes.length > 0 && (
+                <span className="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium text-[11px] border border-sky-200">
+                  已选 {selectedPendingBarcodes.length} 项
+                </span>
+              )}
+            </div>
+
+            {/* 右侧：翻页按钮群、每页条数选择器与跳转 */}
+            <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto light-scrollbar py-0.5">
+              {/* 每页条数选择器 - 默认 10 条 */}
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-slate-500 text-[11px]">每页:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const newSize = Number(e.target.value);
+                    setPageSize(newSize);
+                    setPendingPage(1);
+                    setCollectedPage(1);
+                  }}
+                  className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-slate-800 outline-none focus:border-sky-500 cursor-pointer text-[11px] font-semibold"
+                >
+                  <option value={10}>10 条/页</option>
+                  <option value={20}>20 条/页</option>
+                  <option value={50}>50 条/页</option>
+                </select>
               </div>
-            )}
+
+              <div className="h-3.5 w-px bg-slate-200 mx-0.5 shrink-0" />
+
+              {/* 首页 */}
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage <= 1}
+                className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-600 shrink-0"
+                title="第一页"
+              >
+                <ChevronsLeft className="w-3.5 h-3.5" />
+              </button>
+
+              {/* 上一页 */}
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-0.5 text-slate-700 text-[11px] shrink-0"
+                title="上一页"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>上一页</span>
+              </button>
+
+              {/* 页码按钮群 */}
+              <div className="flex items-center gap-0.5 shrink-0">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => {
+                    if (totalPages <= 5) return true;
+                    return p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1;
+                  })
+                  .map((p, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    const hasEllipsis = prev && p - prev > 1;
+                    return (
+                      <React.Fragment key={p}>
+                        {hasEllipsis && <span className="px-0.5 text-slate-400 text-[10px]">...</span>}
+                        <button
+                          onClick={() => handlePageChange(p)}
+                          className={`min-w-6 h-6 px-1.5 rounded font-mono font-medium text-[11px] transition-all shrink-0 ${
+                            currentPage === p
+                              ? 'bg-sky-600 text-white font-bold shadow-xs'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              {/* 下一页 */}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-0.5 text-slate-700 text-[11px] shrink-0"
+                title="下一页"
+              >
+                <span>下一页</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+
+              {/* 末页 */}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage >= totalPages}
+                className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-600 shrink-0"
+                title="最后一页"
+              >
+                <ChevronsRight className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="h-3.5 w-px bg-slate-200 mx-0.5 shrink-0" />
+
+              {/* 跳转页码 */}
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-slate-500 text-[11px]">跳至</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={jumpPageInput}
+                  onChange={(e) => setJumpPageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = parseInt(jumpPageInput);
+                      if (!isNaN(val)) {
+                        handlePageChange(val);
+                        setJumpPageInput('');
+                      }
+                    }
+                  }}
+                  placeholder={String(currentPage)}
+                  className="w-10 h-6 px-1 border border-slate-300 rounded text-center font-mono text-[11px] outline-none focus:border-sky-500 bg-white"
+                />
+                <span className="text-slate-500 text-[11px]">页</span>
+                <button
+                  onClick={() => {
+                    const val = parseInt(jumpPageInput);
+                    if (!isNaN(val)) {
+                      handlePageChange(val);
+                      setJumpPageInput('');
+                    }
+                  }}
+                  className="px-1.5 py-0.5 bg-white border border-slate-200 text-slate-700 rounded hover:bg-slate-100 text-[11px] font-medium"
+                >
+                  GO
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
       {/* 1. Modal: 手工申请 (严格根据截图要求还原) */}
       <OutpatientManualApplyModal
         isOpen={isManualApplyOpen}
